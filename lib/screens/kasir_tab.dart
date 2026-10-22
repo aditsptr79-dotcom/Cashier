@@ -854,7 +854,11 @@ class _KasirTabState extends State<KasirTab> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Kembalian: ${rupiah((parseNominal(_dibayar.text) - _total).clamp(0, 1 << 62))}',
+                    'Kembalian: ${rupiah(
+  (parseNominal(_dibayar.text) - _total)
+      .clamp(0, 1 << 62)
+      .toInt(),
+)}',
                     style: const TextStyle(
                       color: _greenColor,
                       fontWeight: FontWeight.w600,
