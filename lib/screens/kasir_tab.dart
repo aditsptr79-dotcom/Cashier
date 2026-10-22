@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../database/database_helper.dart';
@@ -38,6 +37,9 @@ class _KasirTabState extends State<KasirTab> {
   int _omzetAwalQris = 0;
 
   final TextEditingController _dibayar = TextEditingController();
+  
+  // State setter khusus agar UI di dalam BottomSheet (HP) ikut terupdate
+  StateSetter? _bottomSheetStateSetter;
 
   int get _total =>
       _cart.fold<int>(0, (sum, item) => sum + item.subtotal);
@@ -58,7 +60,6 @@ class _KasirTabState extends State<KasirTab> {
     if (_kategori == 'Semua') {
       return _menu;
     }
-
     return _menu.where((item) => item.kategori == _kategori).toList();
   }
 
@@ -72,6 +73,12 @@ class _KasirTabState extends State<KasirTab> {
   void dispose() {
     _dibayar.dispose();
     super.dispose();
+  }
+
+  // Fungsi helper agar set state utama & modal sinkron
+  void _updateState(VoidCallback fn) {
+    setState(fn);
+    _bottomSheetStateSetter?.call(fn);
   }
 
   Future<void> _load() async {
@@ -118,7 +125,7 @@ class _KasirTabState extends State<KasirTab> {
   }
 
   void _add(MenuItem item) {
-    setState(() {
+    _updateState(() {
       final index = _cart.indexWhere(
         (cartItem) => cartItem.menu.id == item.id,
       );
@@ -132,7 +139,7 @@ class _KasirTabState extends State<KasirTab> {
   }
 
   void _kurangi(CartItem item) {
-    setState(() {
+    _updateState(() {
       item.jumlah--;
 
       if (item.jumlah <= 0) {
@@ -142,7 +149,7 @@ class _KasirTabState extends State<KasirTab> {
   }
 
   void _tambahJumlah(CartItem item) {
-    setState(() {
+    _updateState(() {
       item.jumlah++;
     });
   }
@@ -191,11 +198,9 @@ class _KasirTabState extends State<KasirTab> {
                           ),
                           validator: (value) {
                             final nominal = parseNominal(value ?? '');
-
                             if (nominal < 0) {
                               return 'Nominal tidak valid';
                             }
-
                             return null;
                           },
                         ),
@@ -211,11 +216,9 @@ class _KasirTabState extends State<KasirTab> {
                           ),
                           validator: (value) {
                             final nominal = parseNominal(value ?? '');
-
                             if (nominal < 0) {
                               return 'Nominal tidak valid';
                             }
-
                             return null;
                           },
                         ),
@@ -328,7 +331,7 @@ class _KasirTabState extends State<KasirTab> {
         .map((item) => '${item.menu.nama} x${item.jumlah}')
         .join(', ');
 
-    setState(() {
+    _updateState(() {
       _saving = true;
     });
 
@@ -345,7 +348,7 @@ class _KasirTabState extends State<KasirTab> {
 
       final kembalian = dibayar - totalTransaksi;
 
-      setState(() {
+      _updateState(() {
         _cart.clear();
         _dibayar.clear();
         _saving = false;
@@ -383,7 +386,7 @@ class _KasirTabState extends State<KasirTab> {
     } catch (e) {
       if (!mounted) return;
 
-      setState(() {
+      _updateState(() {
         _saving = false;
       });
 
@@ -538,9 +541,7 @@ class _KasirTabState extends State<KasirTab> {
                 selected: _kategori == kategori,
                 selectedColor: warnaUtama,
                 labelStyle: TextStyle(
-                  color: _kategori == kategori
-                      ? Colors.white
-                      : _textColor,
+                  color: _kategori == kategori ? Colors.white : _textColor,
                   fontWeight: FontWeight.w600,
                 ),
                 onSelected: (_) {
@@ -744,8 +745,7 @@ class _KasirTabState extends State<KasirTab> {
                 : ListView.separated(
                     padding: const EdgeInsets.all(12),
                     itemCount: _cart.length,
-                    separatorBuilder: (_, __) =>
-                        const Divider(height: 18),
+                    separatorBuilder: (_, __) => const Divider(height: 18),
                     itemBuilder: (context, index) {
                       final item = _cart[index];
 
@@ -835,7 +835,7 @@ class _KasirTabState extends State<KasirTab> {
                   ],
                   selected: {_metode},
                   onSelectionChanged: (selection) {
-                    setState(() {
+                    _updateState(() {
                       _metode = selection.first;
                     });
                   },
@@ -845,6 +845,7 @@ class _KasirTabState extends State<KasirTab> {
                   TextField(
                     controller: _dibayar,
                     keyboardType: TextInputType.number,
+                    onChanged: (value) => _updateState(() {}), // Agar nominal kembalian real-time
                     decoration: const InputDecoration(
                       labelText: 'Uang diterima',
                       prefixText: 'Rp ',
@@ -853,16 +854,20 @@ class _KasirTabState extends State<KasirTab> {
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    'Kembalian: ${rupiah(
-  (parseNominal(_dibayar.text) - _total)
-      .clamp(0, 1 << 62)
-      .toInt(),
-)}',
-                    style: const TextStyle(
-                      color: _greenColor,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Builder(
+                    builder: (context) {
+                      // Clamp nilai kembalian manual agar aman dari overflow limit JS/Web
+                      int kembalian = parseNominal(_dibayar.text) - _total;
+                      if (kembalian < 0) kembalian = 0;
+                      
+                      return Text(
+                        'Kembalian: ${rupiah(kembalian)}',
+                        style: const TextStyle(
+                          color: _greenColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      );
+                    },
                   ),
                 ],
                 const SizedBox(height: 14),
@@ -894,9 +899,7 @@ class _KasirTabState extends State<KasirTab> {
                 SizedBox(
                   height: 50,
                   child: FilledButton.icon(
-                    onPressed: _cart.isEmpty || _saving
-                        ? null
-                        : _checkout,
+                    onPressed: _cart.isEmpty || _saving ? null : _checkout,
                     icon: _saving
                         ? const SizedBox(
                             width: 18,
@@ -945,6 +948,7 @@ class _KasirTabState extends State<KasirTab> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
+                  // Mode Tablet/Desktop
                   if (constraints.maxWidth >= 760) {
                     return Row(
                       children: [
@@ -969,6 +973,7 @@ class _KasirTabState extends State<KasirTab> {
                     );
                   }
 
+                  // Mode Layar Kecil (Mobile)
                   return Column(
                     children: [
                       _kategoriBar(),
@@ -1001,12 +1006,21 @@ class _KasirTabState extends State<KasirTab> {
                                   context: context,
                                   isScrollControlled: true,
                                   useSafeArea: true,
-                                  builder: (_) => SizedBox(
-                                    height: MediaQuery.of(context).size.height *
-                                        0.85,
-                                    child: _cartPanel(),
+                                  builder: (_) => StatefulBuilder(
+                                    builder: (context, bottomSheetSetState) {
+                                      // Simpan state setter khusus bottom sheet
+                                      _bottomSheetStateSetter = bottomSheetSetState;
+                                      
+                                      return SizedBox(
+                                        height: MediaQuery.of(context).size.height * 0.85,
+                                        child: _cartPanel(),
+                                      );
+                                    },
                                   ),
-                                );
+                                ).whenComplete(() {
+                                  // Bersihkan setter saat sheet ditutup
+                                  _bottomSheetStateSetter = null;
+                                });
                               },
                               icon: const Icon(Icons.shopping_cart),
                               label: const Text('Pesanan'),
