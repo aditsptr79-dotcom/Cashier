@@ -75,7 +75,6 @@ class _KasirTabState extends State<KasirTab> {
     super.dispose();
   }
 
-  // Fungsi helper agar set state utama & modal sinkron
   void _updateState(VoidCallback fn) {
     setState(fn);
     _bottomSheetStateSetter?.call(fn);
@@ -90,7 +89,8 @@ class _KasirTabState extends State<KasirTab> {
         tanggalKey(DateTime.now()),
       );
 
-      if (!mounted) return;
+      // Perbaikan: gunakan context.mounted
+      if (!context.mounted) return;
 
       setState(() {
         _menu = menu;
@@ -99,7 +99,8 @@ class _KasirTabState extends State<KasirTab> {
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      // Perbaikan: gunakan context.mounted
+      if (!context.mounted) return;
 
       setState(() {
         _loading = false;
@@ -116,6 +117,7 @@ class _KasirTabState extends State<KasirTab> {
       tanggalKey(DateTime.now()),
     );
 
+    // Boleh pakai mounted biasa karena tidak memanggil context setelah ini
     if (!mounted) return;
 
     setState(() {
@@ -172,7 +174,7 @@ class _KasirTabState extends State<KasirTab> {
           bool menyimpan = false;
 
           return StatefulBuilder(
-            builder: (context, setDialogState) {
+            builder: (contextDialog, setDialogState) {
               return AlertDialog(
                 title: const Text('Input omzet awal'),
                 content: Form(
@@ -269,7 +271,8 @@ class _KasirTabState extends State<KasirTab> {
                               await _refreshOmzetAwal();
                               widget.onChanged();
 
-                              if (mounted) {
+                              // Perbaikan: gunakan context.mounted 
+                              if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text('Omzet awal berhasil disimpan.'),
@@ -283,7 +286,8 @@ class _KasirTabState extends State<KasirTab> {
                                 });
                               }
 
-                              if (mounted) {
+                              // Perbaikan: gunakan context.mounted
+                              if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
@@ -344,7 +348,8 @@ class _KasirTabState extends State<KasirTab> {
         rincian: rincian,
       );
 
-      if (!mounted) return;
+      // Perbaikan: gunakan context.mounted sebelum lanjut (mencegah error saat memanggil context)
+      if (!context.mounted) return;
 
       final kembalian = dibayar - totalTransaksi;
 
@@ -384,7 +389,8 @@ class _KasirTabState extends State<KasirTab> {
         ),
       );
     } catch (e) {
-      if (!mounted) return;
+      // Perbaikan: gunakan context.mounted
+      if (!context.mounted) return;
 
       _updateState(() {
         _saving = false;
@@ -845,7 +851,7 @@ class _KasirTabState extends State<KasirTab> {
                   TextField(
                     controller: _dibayar,
                     keyboardType: TextInputType.number,
-                    onChanged: (value) => _updateState(() {}), // Agar nominal kembalian real-time
+                    onChanged: (value) => _updateState(() {}), 
                     decoration: const InputDecoration(
                       labelText: 'Uang diterima',
                       prefixText: 'Rp ',
@@ -856,7 +862,6 @@ class _KasirTabState extends State<KasirTab> {
                   const SizedBox(height: 6),
                   Builder(
                     builder: (context) {
-                      // Clamp nilai kembalian manual agar aman dari overflow limit JS/Web
                       int kembalian = parseNominal(_dibayar.text) - _total;
                       if (kembalian < 0) kembalian = 0;
                       
@@ -948,7 +953,6 @@ class _KasirTabState extends State<KasirTab> {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  // Mode Tablet/Desktop
                   if (constraints.maxWidth >= 760) {
                     return Row(
                       children: [
@@ -973,7 +977,6 @@ class _KasirTabState extends State<KasirTab> {
                     );
                   }
 
-                  // Mode Layar Kecil (Mobile)
                   return Column(
                     children: [
                       _kategoriBar(),
@@ -1008,7 +1011,6 @@ class _KasirTabState extends State<KasirTab> {
                                   useSafeArea: true,
                                   builder: (_) => StatefulBuilder(
                                     builder: (context, bottomSheetSetState) {
-                                      // Simpan state setter khusus bottom sheet
                                       _bottomSheetStateSetter = bottomSheetSetState;
                                       
                                       return SizedBox(
@@ -1018,7 +1020,6 @@ class _KasirTabState extends State<KasirTab> {
                                     },
                                   ),
                                 ).whenComplete(() {
-                                  // Bersihkan setter saat sheet ditutup
                                   _bottomSheetStateSetter = null;
                                 });
                               },
