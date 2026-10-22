@@ -1,0 +1,93 @@
+
+name: Build APK Flutter
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Ambil source code dari repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Siapkan Java untuk Android build
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      # 3. Siapkan Flutter
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.24.5"
+          cache: true
+
+      # 4. Periksa struktur source code
+      - name: Check required files
+        run: |
+          echo "Memeriksa file proyek..."
+
+          test -f pubspec.yaml || {
+            echo "ERROR: pubspec.yaml tidak ditemukan"
+            exit 1
+          }
+
+          test -f lib/main.dart || {
+            echo "ERROR: lib/main.dart tidak ditemukan"
+            exit 1
+          }
+
+          test -f lib/utils/constants.dart || {
+            echo "ERROR: lib/utils/constants.dart tidak ditemukan"
+            exit 1
+          }
+
+          test -f lib/screens/main_screen.dart || {
+            echo "ERROR: lib/screens/main_screen.dart tidak ditemukan"
+            exit 1
+          }
+
+          test -f lib/screens/kasir_tab.dart || {
+            echo "ERROR: lib/screens/kasir_tab.dart tidak ditemukan"
+            exit 1
+          }
+
+          echo "Semua file wajib ditemukan."
+
+      # 5. Buat konfigurasi platform Android
+      - name: Generate Android project files
+        run: flutter create --platforms=android --project-name kasir_bakso_lokal .
+
+      # 6. Instal dependency
+      - name: Install dependencies
+        run: flutter pub get
+
+      # 7. Analisis kode aplikasi tanpa tes bawaan
+      - name: Analyze application code
+        run: flutter analyze lib/
+
+      # 8. Build APK release
+      - name: Build release APK
+        run: flutter build apk --release
+
+      # 9. Simpan APK sebagai artifact
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kasir-bakso-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30
